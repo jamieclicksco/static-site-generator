@@ -1,0 +1,7 @@
+{
+  "name": "Brollie",
+  "version": "1.0.0",
+  "dependencies": {
+    "viaduct-core": "git@github.com:ViaductCSS/Viaduct.git#0.1.9"
+  }
+}

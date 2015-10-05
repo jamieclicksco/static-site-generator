@@ -1,0 +1,351 @@
+// =============================
+// Core REM Sizing Mixin
+// =============================
+
+//
+// Calculate the REM unit, and return both REMs and pixels to support older browsers.
+//
+// Parameter Description:
+//
+// $property - A string value which contains the property which you want to set a REM unit value for. // "font-size"
+// $values    - The value (in pixels) of the elements property you are setting the REM value for.     // 12
+// $context  - This value is mapped back to the $font-size-base variable set within the _settings.scss partial.
+//
+// Example Use:
+//
+// @include rem-sizing("font-size", 32);
+// @include rem-sizing("padding", 20 20); // Can take multiple values in the $values parameter.
+//
+
+@mixin rem-sizing($property, $values, $context: 16) {
+  $px : ();
+  $rem: ();
+
+  @each $value in $values {
+    $px : append($px , $value);
+    $rem: append($rem, $value);
+  }
+
+  #{$property}: to-pixel($px);
+  #{$property}: calc-rem($rem);
+}
+
+// =============================
+// Core Media Query Mixin
+// =============================
+
+//
+// Add a media query which allows for multiple conditions.
+//
+// Parameter Description:
+//
+// $from - A integer value which relates to the min-width you would like the query to cover.
+// $to   - A integer value which relates to the max-width you would like the query to cover.
+// $and  - A string value containing additional conditions which may be required for the query.
+//
+// Example Use:
+//
+// @include media-query($from: 480, $to: 640, $and: '(orientation: landscape)') {
+//   color: red;
+// }
+//
+// Example Use with Viewport Map:
+//
+// @include media-query($from: nth(map-get($viewport-values, lap), 1),
+//                      $to:   nth(map-get($viewport-values, lap), 2)) {
+//     .box {
+//         color: red;
+//     }
+// }
+//
+
+@mixin media-query($from: false, $to: false, $and: false) {
+  $_from  : 0;
+  $_to    : 0;
+  $_and   : $and or null;
+  $_query : null;
+
+  @if($from) {
+    $_from: calc-em($from);
+  }
+
+  @if($to) {
+    $_to: calc-em($to);
+  }
+
+  @if($_from or $_to or $_and) {
+    @if ($_from != 0) { $_query: '#{$_query} and (min-width: #{$_from})'; }
+    @if ($_to != 0)   { $_query: '#{$_query} and (max-width: #{$_to})';   }
+    @if ($_and)       { $_query: '#{$_query} and #{$_and}';               }
+  }
+
+  $_query: unquote(#{$_query});
+
+  @media all #{$_query} {
+    @content;
+  }
+
+}
+
+// =============================
+// Core Generate Spacing Single Mixin
+// =============================
+
+//
+// A singular instance of spacing properties. Can be used in individual classes to
+// generate the calculated properties.
+// Parameter Description:
+//
+// $property   - A String of the CSS proprty that you would like to target.
+// $units      - A String of a unit that you would to output.
+// $directions - A Map of directions that you would like to output ("top", "right", "bottom", "left").
+//
+// Example Use:
+//
+// @include generate-spacing-single("margin", "1/2", (top, bottom));
+//
+
+@mixin generate-spacing-single($property: 'padding', $unit: "1x", $directions: false) {
+  $operator: str-slice($unit, 2, 2);
+
+  @if map-count($directions) > 0 {
+    @each $position in $directions {
+      @if $operator == 'x' {
+        $amount: str-slice($unit, 1, 1);
+        @include rem-sizing(#{$property}-#{$position}, $base-spacing-unit * to-number($amount));
+      } @else if $operator == '/' {
+        $amount: str-slice($unit, -1, -1);
+        @include rem-sizing(#{$property}-#{$position}, $base-spacing-unit / to-number($amount));
+      } @else {
+        $amount: str-slice($unit, 1, 1);
+        #{$property}-#{$position}: to-number($amount);
+      }
+    }
+  } @else {
+    $amount: str-slice($unit, 1, 1);
+    @include rem-sizing(#{$property}, $base-spacing-unit * to-number(amount));
+  }
+}
+
+// =============================
+// Core Generate Spacing Mixin
+// =============================
+
+//
+// Generates the output for any spacing properties such as margin and padding.
+// Parameter Description:
+//
+// $property  - A String of the CSS proprty that you would like to target.
+// $units     - A Map of units that you would to output.
+// $namespace - A String for optional class name.
+//
+// Example Use:
+//
+// @include generate-spacing("padding", ("1/2", "2x", "3x", "0"), "desk");
+//
+
+@mixin generate-spacing-batch($property: 'padding', $units: $global-spacing-values, $namespace: null) {
+
+  @each $unit in $units {
+
+      $_prop-namespace: str-slice($property, 1, 3);
+
+      @if $namespace != null {
+        @if $property == "margin" {
+            [data-#{$namespace}~="#{$_prop-namespace}-#{$unit}"] {
+              @include generate-spacing-single($property, $unit, ('right', 'bottom'));
+            }
+        } @else {
+            [data-#{$namespace}~="#{$_prop-namespace}-#{$unit}"] {
+              @include generate-spacing-single($property, $unit, ('top', 'right', 'bottom', 'left'));
+            }
+        }
+      } @else {
+        @if $property == "margin" {
+            [class~="#{$_prop-namespace}-#{$unit}"] {
+              @include generate-spacing-single($property, $unit, ('right', 'bottom'));
+            }
+        } @else {
+            [class~="#{$_prop-namespace}-#{$unit}"] {
+              @include generate-spacing-single($property, $unit, ('top', 'right', 'bottom', 'left'));
+            }
+        }
+      }
+
+      @each $direction, $positions in $global-spacing-directions {
+
+          @if $direction == false {
+              $direction: '';
+          } @else {
+              $direction: "-#{$direction}";
+          }
+
+          @if $namespace != null {
+              [data-#{$namespace}~="#{$_prop-namespace}#{$direction}-#{$unit}"] {
+                @include generate-spacing-single($property, $unit, $positions);
+              }
+          } @else {
+              [class~="#{$_prop-namespace}#{$direction}-#{$unit}"] {
+                @include generate-spacing-single($property, $unit, $positions);
+              }
+          }
+
+      }
+
+  }
+
+}
+
+// =============================
+// Generate Grid Percentage Single Mixin
+// =============================
+
+//
+// Generates grid percentages based classes/attributes based on the given viewport values passed.
+// Parameter Description:
+//
+// $viewport-map - Map of viewport values to create.
+// $property     - String the element property to create.
+// $namespace    - String for the optional namespace of created attributes.
+// $viewport     - String for the viewport namespace of created attributes.
+//
+// Example Use:
+//
+// Generate Pull Utility Values:
+//
+// @include generate-grid-percentage-single(map-get($viewport-values, palm), 'pull', 'right', 'palm');
+//
+
+@mixin generate-grid-percentage-single($viewport-map, $namespace: null, $property: 'width', $viewport: null) {
+  $_cols:             nth($viewport-map, 3);
+  $current-attribute: null;
+  $_namespace:        if($namespace, '#{$namespace}-', null);
+
+  //
+  // Store columns in a map as processed, with global columns added first.
+  // Width is the Map key due to Sass limitations and allows is to easily find if it's a
+  // pre-existing class to avoid duplicates.
+  //
+
+  $length-storage: ();
+
+  // Once created a complete Map of existing columns, loop and output.
+
+  @while $_cols > 0 {
+
+      @for $i from 1 through ($_cols) {
+
+        // Generate the length.
+
+        $col-width: (100 / $_cols * $i);
+        $length:    (percentage($col-width / 100));
+
+        // Generate the data attribute or class attribute dependent on if $viewport is set.
+
+        @if ($viewport) {
+          $current-attribute: "[data-#{$viewport}~='#{$_namespace}#{$i}/#{$_cols}']";
+        } @else {
+          $current-attribute: "[class~='#{$_namespace}#{$i}/#{$_cols}']";
+        }
+
+        @if $i == $_cols {
+
+          @if ($viewport) {
+            $current-attribute: "[data-#{$viewport}~='#{$_namespace}1x']";
+          } @else {
+            $current-attribute: "[class~='#{$_namespace}1x']";
+          }
+
+        } @else {
+
+          @if ($viewport) {
+            $current-attribute: "[data-#{$viewport}~='#{$_namespace}#{$i}/#{$_cols}']";
+          } @else {
+            $current-attribute: "[class~='#{$_namespace}#{$i}/#{$_cols}']";
+          }
+
+        }
+
+        // Empty class for scoping.
+
+        $new-attribute: "";
+
+        //
+        // Check if $length is not in $length-storage as a key.
+        // Note: Unquote on insert otherwise $current-attribute will be quoted by default
+        // and will cause output to also be quoted.
+        //
+
+        @if not map-has-key($length-storage, $length) {
+            $new-attribute: ($length: unquote($current-attribute));
+        } @else {
+
+            // Get list of matched attributes.
+
+            $attributes: map-get($length-storage, $length);
+
+            // Append $current-attribute to the $attributes as a comma-seperated list.
+
+            $new-attribute: ($length: append(unquote($current-attribute), $attributes, comma));
+        }
+
+        // Merge the $new-class into the $length-storage.
+
+        $length-storage: map-merge($length-storage, $new-attribute);
+
+      }
+
+      $_cols: $_cols - 1;
+
+  }
+
+  // Output all our created attributes held in $length-storage.
+
+  @each $length, $attributes in $length-storage {
+
+    #{$attributes} {
+      #{$property}: unquote($length);
+    }
+
+  }
+
+}
+
+// =============================
+// Core Generate Grid Percentage Batch Mixin
+// =============================
+
+//
+// Generates batches of grid percentages based classes/attributes based on the given viewport values passed.
+// Parameter Description:
+//
+// $viewport-map    - Map of viewport values to create.
+// $property        - String the element property to create.
+// $namespace       - String for the optional namespace of created classes.
+//
+// Example Use:
+//
+// Generate Pull Utility Values:
+//
+// @include generate-grid-percentage-batch($namespace: 'pull', $property: 'right');
+//
+// Generate Width Utility Values:
+//
+// @include generate-grid-percentage-batch();
+//
+
+@mixin generate-grid-percentage-batch($viewport-map: $viewport-values, $property: 'width', $namespace: null) {
+  $viewport-no-query: null;
+
+  @include generate-grid-percentage-single(map-get($viewport-values, desk), $namespace, $property);
+
+  @each $viewport, $viewport-val in $viewport-map {
+
+    @include media-query($from: nth($viewport-val, 1),
+                         $to:   nth($viewport-val, 2)) {
+      @include generate-grid-percentage-single($viewport-val, $namespace, $property, $viewport);
+    }
+
+  }
+
+}
